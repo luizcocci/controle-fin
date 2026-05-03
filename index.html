@@ -400,21 +400,66 @@ const GRUPOS=['nb','pix','comum','cartao'];
 const CORES={nb:'#2563eb',pix:'#00b87a',comum:'#f59e0b',cartao:'#e8344a'};
 const GNOMES={nb:'Pessoal NB',pix:'PIX',comum:'Comum/Fixo',cartao:'Cartão Caixa'};
 let curM=4,curY=2026,editGrupo=null,editItemId=null,relTipo='mensal';
-const LS={
-  get:(k,d=[])=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
-  set:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),
-  raw:(k,d='')=>localStorage.getItem(k)||d,
-  setRaw:(k,v)=>localStorage.setItem(k,v)
-};
+// ── IndexedDB — persiste no modo "Add to Home Screen" do Safari ──────────────
+const DB_NAME='cfin',DB_VER=1,STORE='kv';
+let _db=null;
+
+function openDB(){
+  return new Promise((res,rej)=>{
+    if(_db){res(_db);return;}
+    const req=indexedDB.open(DB_NAME,DB_VER);
+    req.onupgradeneeded=e=>{e.target.result.createObjectStore(STORE);};
+    req.onsuccess=e=>{_db=e.target.result;res(_db);};
+    req.onerror=e=>rej(e);
+  });
+}
+async function dbGet(k,def=null){
+  try{const db=await openDB();return new Promise((res)=>{
+    const tx=db.transaction(STORE,'readonly');
+    const req=tx.objectStore(STORE).get(k);
+    req.onsuccess=()=>res(req.result??def);
+    req.onerror=()=>res(def);
+  });}catch{return def;}
+}
+async function dbSet(k,v){
+  try{const db=await openDB();return new Promise((res)=>{
+    const tx=db.transaction(STORE,'readwrite');
+    tx.objectStore(STORE).put(v,k);
+    tx.oncomplete=()=>res(true);
+    tx.onerror=()=>res(false);
+  });}catch{return false;}
+}
+async function dbGetAll(){
+  try{const db=await openDB();return new Promise((res)=>{
+    const tx=db.transaction(STORE,'readonly');
+    const store=tx.objectStore(STORE);
+    const keys=[],vals=[];
+    store.openKeyCursor().onsuccess=e=>{
+      const cur=e.target.result;
+      if(cur){keys.push(cur.key);cur.continue();}
+      else{
+        let done=0;
+        if(!keys.length){res({});return;}
+        const out={};
+        keys.forEach(k=>{
+          store.get(k).onsuccess=ev=>{out[k]=ev.target.result;if(++done===keys.length)res(out);};
+        });
+      }
+    };
+  });}catch{return {};}
+}
+
+// Cache síncrono — carregado na inicialização
+let _cache={};
 const iKey=(g,m,y)=>`cfin_${g}_${m??curM}_${y??curY}`;
-const loadItens=(g,m,y)=>LS.get(iKey(g,m,y));
-const saveItens=(g,a,m,y)=>LS.set(iKey(g,m,y),a);
-const loadRenda=(m,y)=>parseFloat(LS.raw(`cfin_renda_${m??curM}_${y??curY}`,LS.raw('cfin_renda','4500')));
-const saveRendaLS=(v,m,y)=>{LS.setRaw(`cfin_renda_${m??curM}_${y??curY}`,v);LS.setRaw('cfin_renda',v);};
-const loadBanco=(m,y)=>parseFloat(LS.raw(`cfin_banco_${m??curM}_${y??curY}`,'0'));
-const saveBanco=(v,m,y)=>LS.setRaw(`cfin_banco_${m??curM}_${y??curY}`,v);
-const loadBHist=(m,y)=>LS.get(`cfin_bhist_${m??curM}_${y??curY}`);
-const saveBHist=(a,m,y)=>LS.set(`cfin_bhist_${m??curM}_${y??curY}`,a);
+const loadItens=(g,m,y)=>{const v=_cache[iKey(g,m,y)];return Array.isArray(v)?v:[];};
+const saveItens=(g,a,m,y)=>{const k=iKey(g,m,y);_cache[k]=a;dbSet(k,a);};
+const loadRenda=(m,y)=>{const k=`cfin_renda_${m??curM}_${y??curY}`;return parseFloat(_cache[k]??_cache['cfin_renda']??4500);};
+const saveRendaLS=(v)=>{const k=`cfin_renda_${curM}_${curY}`;_cache[k]=v;_cache['cfin_renda']=v;dbSet(k,v);dbSet('cfin_renda',v);};
+const loadBanco=(m,y)=>parseFloat(_cache[`cfin_banco_${m??curM}_${y??curY}`]??0);
+const saveBanco=(v,m,y)=>{const k=`cfin_banco_${m??curM}_${y??curY}`;_cache[k]=v;dbSet(k,v);};
+const loadBHist=(m,y)=>{const v=_cache[`cfin_bhist_${m??curM}_${y??curY}`];return Array.isArray(v)?v:[];};
+const saveBHist=(a,m,y)=>{const k=`cfin_bhist_${m??curM}_${y??curY}`;_cache[k]=a;dbSet(k,a);};
 const fmt=v=>'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const totalG=(g,m,y)=>loadItens(g,m,y).reduce((s,i)=>s+i.value,0);
 const totalAll=(m,y)=>GRUPOS.reduce((s,g)=>s+totalG(g,m,y),0);
@@ -707,25 +752,31 @@ function exportPDF(){
   }
 }
 function exportBk(){
-  const bk={versao:'2.0',data:new Date().toISOString(),dados:{}};
-  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('cfin_'))bk.dados[k]=localStorage.getItem(k);}
+  const bk={versao:'3.0',data:new Date().toISOString(),dados:{}};
+  Object.entries(_cache).forEach(([k,v])=>{if(k.startsWith('cfin_'))bk.dados[k]=v;});
   const blob=new Blob([JSON.stringify(bk,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const hoje=new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
   const a=document.createElement('a');a.href=url;a.download=`controle-fin-backup-${hoje}.json`;a.click();
   URL.revokeObjectURL(url);
-  toast('Backup exportado! Salve no iCloud Drive 📂');
+  toast('Backup exportado! Salve no Google Drive 📂');
 }
 function importBk(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=ev=>{
+  reader.onload=async ev=>{
     try{
       const bk=JSON.parse(ev.target.result);
       if(!bk.dados){toast('Arquivo inválido.');return;}
-      Object.entries(bk.dados).forEach(([k,v])=>localStorage.setItem(k,v));
+      // Suporte a backups antigos (v2 localStorage) e novos (v3 IndexedDB)
+      const entries=Object.entries(bk.dados);
+      for(const [k,v] of entries){
+        const val=typeof v==='string'?JSON.parse(v) : v;
+        _cache[k]=val;
+        await dbSet(k,val);
+      }
       render();toast('✅ Backup restaurado!');
-    }catch{toast('Erro ao ler o arquivo.');}
+    }catch(err){toast('Erro ao ler o arquivo.');}
   };
   reader.readAsText(file);e.target.value='';
 }
@@ -737,9 +788,17 @@ function seed(){
   saveItens('cartao',[{id:1,desc:'Anuidade Cartão',value:17.25,rec:'fixo'},{id:2,desc:'Amazon',value:96.83,rec:'variavel'}]);
   saveBanco(1000);saveBHist([{data:new Date().toLocaleDateString('pt-BR'),tipo:'Definição',val:1000}]);
 }
-seed();
-document.getElementById('monLbl').textContent=MESES[curM]+' '+curY;
-render();
+// Inicializa: carrega todo o IndexedDB no cache, depois arranca
+async function init(){
+  try{
+    const all=await dbGetAll();
+    _cache=all||{};
+  }catch{_cache={};}
+  document.getElementById('monLbl').textContent=MESES[curM]+' '+curY;
+  seed();
+  render();
+}
+init();
 </script>
 </body>
 </html>
