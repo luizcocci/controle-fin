@@ -399,7 +399,7 @@ const MESES_FULL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
 const GRUPOS=['nb','pix','comum','cartao'];
 const CORES={nb:'#2563eb',pix:'#00b87a',comum:'#f59e0b',cartao:'#e8344a'};
 const GNOMES={nb:'Pessoal NB',pix:'PIX',comum:'Comum/Fixo',cartao:'Cartão Caixa'};
-let curM=4,curY=2026,editGrupo=null,editItemId=null,relTipo='mensal';
+const _now=new Date();let curM=_now.getMonth(),curY=_now.getFullYear(),editGrupo=null,editItemId=null,relTipo='mensal';
 // ── IndexedDB — persiste no modo "Add to Home Screen" do Safari ──────────────
 const DB_NAME='cfin',DB_VER=1,STORE='kv';
 let _db=null;
