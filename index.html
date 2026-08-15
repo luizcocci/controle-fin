@@ -171,6 +171,7 @@ main{padding:16px 16px 0}
 .edit-name{flex:1;font-size:.88rem;font-weight:500}
 .edit-cnt{font-size:.75rem;color:var(--muted);font-family:'JetBrains Mono',monospace}
 .edit-del{background:var(--red-bg);border:none;border-radius:7px;color:var(--red);font-size:.72rem;font-weight:700;padding:4px 10px;cursor:pointer;font-family:'Outfit',sans-serif}
+.edit-btn-edit{background:var(--blue-bg);border:none;border-radius:7px;color:var(--blue);font-size:.72rem;font-weight:700;padding:4px 10px;cursor:pointer;font-family:'Outfit',sans-serif}
 .add-grupo-form{background:var(--white);border-radius:16px;border:1px solid var(--border);padding:16px;box-shadow:0 1px 4px #0000000a}
 .add-grupo-title{font-size:.78rem;font-weight:700;margin-bottom:12px;letter-spacing:-.01em}
 .color-picks{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
@@ -405,6 +406,20 @@ main{padding:16px 16px 0}
       <div class="flabel">Histórico de entradas</div>
       <div class="saldo-hist" id="bancoHist"></div>
     </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR GRUPO -->
+<div class="overlay" id="ovEditGrupo" onclick="closeOv('ovEditGrupo',event)">
+  <div class="modal">
+    <div class="mhandle"></div>
+    <div class="mtitle">Editar Grupo</div>
+    <input type="hidden" id="editGrupoId">
+    <label class="flabel">Nome do grupo</label>
+    <input class="finput" id="editGrupoNome" placeholder="Ex: Lazer, Saúde...">
+    <label class="flabel">Cor</label>
+    <div class="color-picks" id="editColorPicks"></div>
+    <button class="savebtn" onclick="saveEditGrupo()" style="margin-top:12px">Salvar</button>
   </div>
 </div>
 
@@ -705,7 +720,10 @@ function renderEditList(){
       <div class="edit-dot" style="background:${g.cor}"></div>
       <div class="edit-name">${g.nome}</div>
       <div class="edit-cnt">${loadItens(g.id).length} itens</div>
-      <button class="edit-del" onclick="confirmarDelGrupo('${g.id}','${g.nome}')">Excluir</button>
+      <div style="display:flex;gap:6px">
+        <button class="edit-btn-edit" onclick="openEditGrupoModal('${g.id}')">Editar</button>
+        <button class="edit-del" onclick="confirmarDelGrupo('${g.id}','${g.nome}')">Excluir</button>
+      </div>
     </div>`).join('');
 }
 
@@ -833,6 +851,40 @@ function buildColorPicks(){
 function selectColor(c){
   selectedColor=c;
   document.querySelectorAll('.cpick').forEach(el=>{
+    el.classList.toggle('selected',el.style.background===c||el.style.backgroundColor===c);
+  });
+}
+function openEditGrupoModal(gid){
+  const g=loadGrupos().find(x=>x.id===gid);
+  if(!g)return;
+  document.getElementById('editGrupoId').value=gid;
+  document.getElementById('editGrupoNome').value=g.nome;
+  selectedEditColor=g.cor;
+  buildEditColorPicks(g.cor);
+  openOv('ovEditGrupo');
+  setTimeout(()=>document.getElementById('editGrupoNome').focus(),300);
+}
+function saveEditGrupo(){
+  const gid=document.getElementById('editGrupoId').value;
+  const nome=document.getElementById('editGrupoNome').value.trim();
+  if(!nome){toast('Digite o nome do grupo.');return;}
+  const grupos=loadGrupos().map(g=>g.id===gid?{...g,nome,cor:selectedEditColor}:g);
+  saveGrupos(grupos);
+  document.getElementById('ovEditGrupo').classList.remove('open');
+  buildNav();render();
+  toast('Grupo atualizado!');
+}
+let selectedEditColor='#2563eb';
+function buildEditColorPicks(atual){
+  selectedEditColor=atual;
+  const el=document.getElementById('editColorPicks');
+  el.innerHTML=CORES_PALETA.map(c=>`
+    <div class="cpick${c===atual?' selected':''}" style="background:${c}" onclick="selectEditColor('${c}')"></div>
+  `).join('');
+}
+function selectEditColor(c){
+  selectedEditColor=c;
+  document.querySelectorAll('#editColorPicks .cpick').forEach(el=>{
     el.classList.toggle('selected',el.style.background===c||el.style.backgroundColor===c);
   });
 }
