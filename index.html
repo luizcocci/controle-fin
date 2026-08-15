@@ -5,12 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="color-scheme" content="light">
 <meta name="apple-mobile-web-app-title" content="Controle.fin">
 <title>Controle.fin</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
+  color-scheme:light;
   --bg:#f4f6f9;--white:#fff;--border:#e8ecf2;--border2:#d0d8e8;
   --text:#0f1218;--muted:#8a93a8;--muted2:#c4ccd8;
   --green:#00b87a;--green-bg:#e6f8f2;--green-dark:#007a50;
@@ -18,7 +20,7 @@
   --amber:#d97706;--amber-bg:#fef3c7;
   --red:#dc2626;--red-bg:#fee2e2;
 }
-body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;padding-bottom:80px;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text);color-scheme:light;font-family:'Outfit',sans-serif;min-height:100vh;padding-bottom:80px;-webkit-font-smoothing:antialiased}
 
 /* HEADER */
 .hdr{background:var(--white);border-bottom:1px solid var(--border);padding:16px 18px 12px;position:sticky;top:0;z-index:100;padding-top:max(16px,env(safe-area-inset-top));box-shadow:0 1px 8px #0000000a}
@@ -27,6 +29,7 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 .appicon{width:30px;height:30px;border-radius:8px;overflow:hidden;flex-shrink:0}
 .appicon svg{width:100%;height:100%}
 .appname em{color:var(--blue);font-style:normal}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--blue));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;box-shadow:0 2px 8px #2563eb33}
 .monnav{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border2);border-radius:20px;padding:5px 14px}
 .monnav button{background:none;border:none;color:var(--muted);font-size:1rem;cursor:pointer;padding:0;line-height:1}
 .monlbl{font-family:'JetBrains Mono',monospace;font-size:.75rem;font-weight:600;min-width:68px;text-align:center}
@@ -214,26 +217,12 @@ main{padding:16px 16px 0}
 
 <div class="hdr">
   <div class="hdr-top">
-    <div class="appname">
-      <div class="appicon">
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-          <rect width="100" height="100" fill="#0f1218"/>
-          <rect x="12" y="34" width="76" height="48" rx="8" fill="#00b87a"/>
-          <rect x="12" y="37" width="76" height="16" fill="#009966"/>
-          <circle cx="50" cy="54" r="10" fill="#0f1218"/>
-          <circle cx="50" cy="54" r="6" fill="#00e090"/>
-          <text x="50" y="58" font-size="8" fill="#0f1218" text-anchor="middle" font-family="monospace" font-weight="bold">R$</text>
-          <rect x="26" y="22" width="16" height="16" rx="4" fill="#d97706"/>
-          <rect x="58" y="22" width="16" height="16" rx="4" fill="#d97706"/>
-        </svg>
-      </div>
-      Controle<em>.fin</em>
-    </div>
     <div class="monnav">
       <button onclick="chgMonth(-1)">‹</button>
       <span class="monlbl" id="monLbl">JUN 2026</span>
       <button onclick="chgMonth(1)">›</button>
     </div>
+    <div class="avatar">M</div>
   </div>
 </div>
 
