@@ -644,62 +644,42 @@ function chgMonth(d){
 
 // ── PROPAGAÇÃO FIXOS/PARCELADOS ───────────────────────────────────────────
 function propagateFixos(){
-  // Estratégia: para cada grupo, encontra TODOS os itens fixos/parcelados
-  // que existem em qualquer mês, e garante que apareçam corretamente no mês atual.
-  // Usa o mês de origem (parcAtual=1 ou fixo sem sourceId) como fonte da verdade.
-
+  // Fallback: garante que itens fixos/parcelados originais
+  // existam no mês atual caso não tenham sido gravados pelo saveItem
   loadGrupos().forEach(g=>{
     const curr=loadItens(g.id,curM,curY);
     const currSids=new Set(curr.map(i=>i.sourceId||i.id));
     const toAdd=[];
+    const originais={};
 
-    // Passo 1: encontrar todos os itens ORIGINAIS (sem sourceId = são a origem)
-    // varredura nos últimos 36 meses
-    const originais={}; // sid -> item original
-    for(let i=36;i>=1;i--){
+    for(let i=36;i>=0;i--){
       let pm=curM-i,py=curY;
       while(pm<0){pm+=12;py--;}
       loadItens(g.id,pm,py).forEach(item=>{
         if(item.rec!=='fixo'&&item.rec!=='parcelado')return;
-        // Item original: não tem sourceId (ele mesmo é a fonte)
-        if(!item.sourceId){
-          originais[item.id]=item;
+        if(!item.sourceId&&!originais[item.id]){
+          originais[item.id]={item,origM:pm,origY:py};
         }
       });
     }
 
-    // Passo 2: para cada original, calcular o que deve aparecer no mês atual
-    Object.entries(originais).forEach(([sid,orig])=>{
-      if(currSids.has(sid))return; // já está no mês atual
+    Object.entries(originais).forEach(([sid,{item:orig,origM,origY}])=>{
+      const sidN=isNaN(Number(sid))?sid:Number(sid);
+      if(currSids.has(sidN)||currSids.has(sid))return;
+      const mesesPassados=(curY-origY)*12+(curM-origM);
+      if(mesesPassados<=0)return;
 
       if(orig.rec==='fixo'){
-        // Fixo: simplesmente replica
-        toAdd.push({...orig,id:Date.now()+Math.random(),sourceId:sid});
-
-      } else if(orig.rec==='parcelado'){
-        // Parcelado: descobrir em qual mês o original foi lançado
-        // para calcular quantas parcelas já passaram até curM/curY
-        let origM=null,origY=null;
-        for(let i=36;i>=1;i--){
-          let pm=curM-i,py=curY;
-          while(pm<0){pm+=12;py--;}
-          const found=loadItens(g.id,pm,py).find(it=>it.id===sid);
-          if(found){origM=pm;origY=py;break;}
-        }
-        if(origM===null)return;
-
-        // Quantos meses se passaram desde o original até o mês atual
-        const mesesPassados=(curY-origY)*12+(curM-origM);
+        toAdd.push({...orig,id:Date.now()+Math.random(),sourceId:sidN||sid});
+      }else if(orig.rec==='parcelado'){
         const parcAtual=(orig.parcAtual||1)+mesesPassados;
-
         if(parcAtual<=(orig.totalParc||1)){
-          toAdd.push({...orig,id:Date.now()+Math.random(),sourceId:sid,parcAtual});
+          toAdd.push({...orig,id:Date.now()+Math.random(),sourceId:sidN||sid,parcAtual});
         }
-        // se parcAtual > totalParc: parcela encerrada, não adiciona
       }
     });
 
-    if(toAdd.length) saveItens(g.id,[...curr,...toAdd],curM,curY);
+    if(toAdd.length)saveItens(g.id,[...curr,...toAdd],curM,curY);
   });
 }
 
@@ -878,15 +858,78 @@ function saveItem(){
     if(tot<2){toast('Informe o número de parcelas (mín. 2).');return;}
     extra={totalParc:tot,parcAtual:atual};
   }
-  let list=loadItens(editGrupoId);
+
   if(editItemId){
+    // Edição: atualiza no mês atual e nos futuros (onde sourceId bate)
+    let list=loadItens(editGrupoId);
     list=list.map(i=>i.id===editItemId?{...i,desc,value:val,rec,cat,...extra}:i);
+    saveItens(editGrupoId,list);
+    // Atualiza propagações futuras
+    const sid=editItemId;
+    for(let i=1;i<=36;i++){
+      let fm=curM+i,fy=curY;
+      while(fm>11){fm-=12;fy++;}
+      const fl=loadItens(editGrupoId,fm,fy);
+      const idx=fl.findIndex(x=>(x.sourceId===sid||x.sourceId===Number(sid)));
+      if(idx>=0){
+        if(rec==='parcelado'){
+          const novaParcAtual=(extra.parcAtual||1)+i;
+          if(novaParcAtual<=(extra.totalParc||1)){
+            fl[idx]={...fl[idx],desc,value:val,rec,cat,parcAtual:novaParcAtual,totalParc:extra.totalParc};
+            saveItens(editGrupoId,fl,fm,fy);
+          } else {
+            // Parcela encerrada — remove dos meses futuros
+            saveItens(editGrupoId,fl.filter((_,j)=>j!==idx),fm,fy);
+          }
+        } else if(rec==='fixo'){
+          fl[idx]={...fl[idx],desc,value:val,rec,cat};
+          saveItens(editGrupoId,fl,fm,fy);
+        } else {
+          // Mudou para variável — remove propagações futuras
+          saveItens(editGrupoId,fl.filter((_,j)=>j!==idx),fm,fy);
+        }
+      }
+    }
     toast('Item atualizado!');
-  }else{
-    list.push({id:Date.now(),desc,value:val,rec,cat,...extra});
+  } else {
+    // Novo item
+    const newId=Date.now();
+    const novoItem={id:newId,desc,value:val,rec,cat,...extra};
+    // Salva no mês atual
+    const list=loadItens(editGrupoId);
+    list.push(novoItem);
+    saveItens(editGrupoId,list);
+
+    // Se fixo ou parcelado, grava nos meses futuros imediatamente
+    if(rec==='fixo'){
+      for(let i=1;i<=36;i++){
+        let fm=curM+i,fy=curY;
+        while(fm>11){fm-=12;fy++;}
+        const fl=loadItens(editGrupoId,fm,fy);
+        // Só adiciona se não existir ainda
+        if(!fl.find(x=>x.sourceId===newId)){
+          fl.push({...novoItem,id:Date.now()+Math.random(),sourceId:newId});
+          saveItens(editGrupoId,fl,fm,fy);
+        }
+      }
+    } else if(rec==='parcelado'){
+      const parcInicial=extra.parcAtual||1;
+      const parcTotal=extra.totalParc||1;
+      for(let i=1;i<=36;i++){
+        const novaParcAtual=parcInicial+i;
+        if(novaParcAtual>parcTotal)break;
+        let fm=curM+i,fy=curY;
+        while(fm>11){fm-=12;fy++;}
+        const fl=loadItens(editGrupoId,fm,fy);
+        if(!fl.find(x=>x.sourceId===newId)){
+          fl.push({...novoItem,id:Date.now()+Math.random(),sourceId:newId,parcAtual:novaParcAtual});
+          saveItens(editGrupoId,fl,fm,fy);
+        }
+      }
+    }
     toast('Item salvo!');
   }
-  saveItens(editGrupoId,list);
+
   document.getElementById('ovItem').classList.remove('open');
   renderGrupo(editGrupoId);
   render();
@@ -1283,10 +1326,61 @@ async function init(){
   try{const all=await dbGetAll();_cache=all||{};}catch{_cache={};}
   document.getElementById('monLbl').textContent=MESES[curM]+' '+curY;
   seed();
+  migrarFixosExistentes();
   buildColorPicks();
   buildNav();
   render();
 }
+
+// Roda uma vez para propagar itens fixos/parcelados que já existem
+// mas ainda não foram gravados nos meses futuros
+function migrarFixosExistentes(){
+  if(_cache['cfin_migrado_v2'])return; // já rodou
+  loadGrupos().forEach(g=>{
+    // Varre todos os meses em busca de originais
+    for(let i=36;i>=0;i--){
+      let pm=curM-i,py=curY;
+      while(pm<0){pm+=12;py--;}
+      const itens=loadItens(g.id,pm,py);
+      itens.forEach(orig=>{
+        if(orig.rec!=='fixo'&&orig.rec!=='parcelado')return;
+        if(orig.sourceId)return; // não é original
+        // Verifica meses futuros e preenche os que estão faltando
+        if(orig.rec==='fixo'){
+          for(let j=1;j<=36;j++){
+            let fm=pm+j,fy=py;
+            while(fm>11){fm-=12;fy++;}
+            // Não propaga além do mês atual
+            if(fy>curY||(fy===curY&&fm>curM))break;
+            const fl=loadItens(g.id,fm,fy);
+            const jaExiste=fl.find(x=>x.sourceId===orig.id||x.sourceId===Number(orig.id));
+            if(!jaExiste){
+              fl.push({...orig,id:Date.now()+Math.random(),sourceId:orig.id});
+              saveItens(g.id,fl,fm,fy);
+            }
+          }
+        }else if(orig.rec==='parcelado'){
+          for(let j=1;j<=36;j++){
+            const novaParcAtual=(orig.parcAtual||1)+j;
+            if(novaParcAtual>(orig.totalParc||1))break;
+            let fm=pm+j,fy=py;
+            while(fm>11){fm-=12;fy++;}
+            if(fy>curY||(fy===curY&&fm>curM))break;
+            const fl=loadItens(g.id,fm,fy);
+            const jaExiste=fl.find(x=>x.sourceId===orig.id||x.sourceId===Number(orig.id));
+            if(!jaExiste){
+              fl.push({...orig,id:Date.now()+Math.random(),sourceId:orig.id,parcAtual:novaParcAtual});
+              saveItens(g.id,fl,fm,fy);
+            }
+          }
+        }
+      });
+    }
+  });
+  _cache['cfin_migrado_v2']=true;
+  dbSet('cfin_migrado_v2',true);
+}
+
 init();
 </script>
 </body>
