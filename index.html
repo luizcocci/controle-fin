@@ -644,26 +644,53 @@ function chgMonth(d){
 
 // ── PROPAGAÇÃO FIXOS/PARCELADOS ───────────────────────────────────────────
 function propagateFixos(){
-  let pm=curM-1,py=curY;
-  if(pm<0){pm=11;py--;}
+  // Busca itens fixos/parcelados em TODOS os meses anteriores (até 24 meses atrás)
+  // Isso garante propagação mesmo que meses intermediários estejam vazios
   loadGrupos().forEach(g=>{
-    const prev=loadItens(g.id,pm,py);
-    if(!prev.length)return;
     const curr=loadItens(g.id,curM,curY);
     const currSids=new Set(curr.map(i=>i.sourceId||i.id));
     const toAdd=[];
-    prev.forEach(i=>{
-      const sid=i.sourceId||i.id;
-      if(currSids.has(sid))return;
-      if(i.rec==='fixo'){
-        toAdd.push({...i,id:Date.now()+Math.random(),sourceId:sid});
-      }else if(i.rec==='parcelado'){
-        const prox=(i.parcAtual||1)+1;
-        if(prox<=(i.totalParc||1)){
-          toAdd.push({...i,id:Date.now()+Math.random(),sourceId:sid,parcAtual:prox});
+
+    // Coleta todos os itens fixos/parcelados dos últimos 24 meses
+    const todosFixos={}; // sid -> item mais recente
+    for(let i=1;i<=24;i++){
+      let pm=curM-i,py=curY;
+      while(pm<0){pm+=12;py--;}
+      const prev=loadItens(g.id,pm,py);
+      prev.forEach(item=>{
+        if(item.rec!=='fixo'&&item.rec!=='parcelado')return;
+        const sid=item.sourceId||item.id;
+        // Guarda o item mais recente de cada source
+        if(!todosFixos[sid]) todosFixos[sid]=item;
+      });
+    }
+
+    // Para cada item fixo/parcelado encontrado, propaga para o mês atual
+    Object.entries(todosFixos).forEach(([sid,item])=>{
+      if(currSids.has(sid))return; // já existe no mês atual
+
+      if(item.rec==='fixo'){
+        toAdd.push({...item,id:Date.now()+Math.random(),sourceId:sid});
+      } else if(item.rec==='parcelado'){
+        // Calcula quantas parcelas já foram pagas buscando no histórico
+        let maxParcAtual=item.parcAtual||1;
+        for(let i=1;i<=24;i++){
+          let pm=curM-i,py=curY;
+          while(pm<0){pm+=12;py--;}
+          const prev=loadItens(g.id,pm,py);
+          prev.forEach(it=>{
+            if((it.sourceId||it.id)===sid&&(it.parcAtual||1)>maxParcAtual){
+              maxParcAtual=it.parcAtual||1;
+            }
+          });
+        }
+        const prox=maxParcAtual+1;
+        if(prox<=(item.totalParc||1)){
+          toAdd.push({...item,id:Date.now()+Math.random(),sourceId:sid,parcAtual:prox});
         }
       }
     });
+
     if(toAdd.length) saveItens(g.id,[...curr,...toAdd],curM,curY);
   });
 }
