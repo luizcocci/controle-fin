@@ -379,6 +379,20 @@ main{padding:16px 16px 0}
   </div>
 </main>
 
+<!-- MODAL EDITAR CATEGORIA -->
+<div class="overlay" id="ovEditCat" onclick="closeOv('ovEditCat',event)">
+  <div class="modal">
+    <div class="mhandle"></div>
+    <div class="mtitle">Editar Categoria</div>
+    <input type="hidden" id="editCatId">
+    <label class="flabel">Nome</label>
+    <input class="finput" id="editCatNome" placeholder="Ex: Farmácia, Mercado...">
+    <label class="flabel">Cor</label>
+    <div class="color-picks" id="editCatColorPicks"></div>
+    <button class="savebtn" onclick="saveEditCat()" style="margin-top:12px">Salvar</button>
+  </div>
+</div>
+
 <!-- MODAL CATEGORIAS -->
 <div class="overlay" id="ovCat" onclick="closeOv('ovCat',event)">
   <div class="modal">
@@ -485,7 +499,7 @@ main{padding:16px 16px 0}
 // ── CONSTANTES ────────────────────────────────────────────────────────────
 const MESES=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 const MESES_FULL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const CORES_PALETA=['#2563eb','#00b87a','#d97706','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#0284c7'];
+const CORES_PALETA=['#2563eb','#00b87a','#d97706','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#0284c7','#FFD700'];
 
 // ── ESTADO ────────────────────────────────────────────────────────────────
 const _now=new Date();
@@ -1063,7 +1077,7 @@ function saveCats(c){_cache['cfin_cats']=c;dbSet('cfin_cats',c);}
 let selectedCatColor=CORES_PALETA[0];
 
 function buildCatSelect(selectedId=''){
-  const cats=loadCats();
+  const cats=[...loadCats()].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
   const el=document.getElementById('iCat');
   if(!el)return;
   el.innerHTML='<option value="">— Sem categoria —</option>'+
@@ -1113,7 +1127,7 @@ function delCategoria(cid){
 }
 
 function renderCatEditList(){
-  const cats=loadCats();
+  const cats=[...loadCats()].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
   const el=document.getElementById('catEditList');
   if(!el)return;
   if(!cats.length){el.innerHTML='<div class="empty">Nenhuma categoria.</div>';return;}
@@ -1121,10 +1135,42 @@ function renderCatEditList(){
     <div class="cat-edit-row">
       <div class="cat-edit-dot" style="background:${c.cor}"></div>
       <div class="cat-edit-name">${c.nome}</div>
-      <button class="cat-edit-del" onclick="delCategoria('${c.id}')">Remover</button>
+      <div style="display:flex;gap:6px">
+        <button class="edit-btn-edit" onclick="openEditCatModal('${c.id}')">Editar</button>
+        <button class="cat-edit-del" onclick="delCategoria('${c.id}')">Remover</button>
+      </div>
     </div>`).join('');
 }
 
+let selectedEditCatColor='#2563eb';
+function openEditCatModal(cid){
+  const cat=loadCats().find(c=>c.id===cid);if(!cat)return;
+  document.getElementById('editCatId').value=cid;
+  document.getElementById('editCatNome').value=cat.nome;
+  selectedEditCatColor=cat.cor;
+  buildEditCatColorPicks(cat.cor);
+  openOv('ovEditCat');
+  setTimeout(()=>document.getElementById('editCatNome').focus(),300);
+}
+function buildEditCatColorPicks(atual){
+  selectedEditCatColor=atual;
+  const el=document.getElementById('editCatColorPicks');if(!el)return;
+  el.innerHTML=CORES_PALETA.map(c=>`<div class="cpick${c===atual?' selected':''}" style="background:${c}" onclick="selectEditCatColor('${c}')"></div>`).join('');
+}
+function selectEditCatColor(c){
+  selectedEditCatColor=c;
+  document.querySelectorAll('#editCatColorPicks .cpick').forEach(el=>{el.classList.toggle('selected',el.style.background===c||el.style.backgroundColor===c);});
+}
+function saveEditCat(){
+  const cid=document.getElementById('editCatId').value;
+  const nome=document.getElementById('editCatNome').value.trim();
+  if(!nome){toast('Digite o nome.');return;}
+  const cats=loadCats().map(c=>c.id===cid?{...c,nome,cor:selectedEditCatColor}:c);
+  saveCats(cats);
+  document.getElementById('ovEditCat').classList.remove('open');
+  renderCatEditList();renderCatBars();buildCatSelect();
+  toast('Categoria atualizada!');
+}
 function renderCatBars(){
   const cats=loadCats();
   const grupos=loadGrupos();
