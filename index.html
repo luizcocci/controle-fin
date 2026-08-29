@@ -210,6 +210,26 @@ main{padding:16px 16px 0}
 .btn-cancel{background:var(--bg);color:var(--muted);border:1px solid var(--border2)!important}
 .btn-confirm{background:var(--red);color:#fff}
 
+.cat-select{width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;padding:11px 13px;font-family:'Outfit',sans-serif;font-size:.9rem;color:var(--text);outline:none;-webkit-appearance:none;transition:border-color .15s;margin-bottom:13px}
+.cat-select:focus{border-color:var(--blue);background:var(--white)}
+.cat-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:.62rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-left:4px;vertical-align:middle}
+.cat-card{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px #0000000a}
+.cat-item{margin-bottom:10px}.cat-item:last-child{margin-bottom:0}
+.cat-row{display:flex;justify-content:space-between;margin-bottom:4px}
+.cat-name{font-size:.82rem;font-weight:500;display:flex;align-items:center;gap:6px}
+.cat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.cat-val{font-size:.82rem;font-family:'JetBrains Mono',monospace;color:var(--muted)}
+.cat-bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.cat-bar-fill{height:100%;border-radius:2px}
+.edit-cats-title{font-size:.78rem;font-weight:700;margin:16px 0 10px;letter-spacing:-.01em}
+.cat-edit-row{display:flex;align-items:center;padding:11px 15px;border-bottom:1px solid var(--border);gap:10px}
+.cat-edit-row:last-child{border-bottom:none}
+.cat-edit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cat-edit-name{flex:1;font-size:.86rem;font-weight:500}
+.cat-edit-del{background:var(--red-bg);border:none;border-radius:6px;color:var(--red);font-size:.7rem;font-weight:700;padding:3px 8px;cursor:pointer;font-family:'Outfit',sans-serif}
+.add-cat-row{display:flex;gap:8px;margin-top:12px}
+.add-cat-row .finput{margin-bottom:0;flex:1}
+.add-cat-btn{background:var(--green);color:#fff;border:none;border-radius:10px;padding:11px 14px;font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap}
 .toast{display:none;position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:20px;font-size:.8rem;font-weight:500;z-index:300;white-space:nowrap;box-shadow:0 4px 16px #00000020}
 #importInput{display:none}
 </style>
@@ -263,6 +283,10 @@ main{padding:16px 16px 0}
         </div>
         <div class="legend" id="donutLegend"></div>
       </div>
+    </div>
+    <div class="cat-card">
+      <div class="ctitle">Gastos por Categoria</div>
+      <div id="catBars"></div>
     </div>
     <div class="bkcard">
       <div class="ctitle">☁️ Backup dos Dados</div>
@@ -328,6 +352,7 @@ main{padding:16px 16px 0}
           <div class="rel-kpi"><div class="rel-kpi-label">Média Mensal</div><div class="rel-kpi-val" id="relMedia">—</div></div>
         </div>
         <div class="rel-breakdown"><div class="rel-breakdown-title">Por Grupo</div><div id="relGrupos"></div></div>
+        <div class="rel-breakdown"><div class="rel-breakdown-title">Por Categoria</div><div id="relCats"></div></div>
         <div class="rel-breakdown" id="relMesesWrap" style="display:none"><div class="rel-breakdown-title">Por Mês</div><div id="relMeses"></div></div>
       </div>
       <button class="rel-pdf-btn" onclick="exportPDF()">📄 Exportar / Compartilhar PDF</button>
@@ -347,8 +372,25 @@ main{padding:16px 16px 0}
       <div class="color-picks" id="colorPicks"></div>
       <button class="savebtn" onclick="criarGrupo()">Criar Grupo</button>
     </div>
+    <div style="height:16px"></div>
+    <div class="sec-title" style="margin-bottom:8px">Categorias</div>
+    <div class="icard" id="catEditList"></div>
+    <button class="addbtn" style="margin-top:8px" onclick="openNovaCatModal()">+ Nova Categoria</button>
   </div>
 </main>
+
+<!-- MODAL CATEGORIAS -->
+<div class="overlay" id="ovCat" onclick="closeOv('ovCat',event)">
+  <div class="modal">
+    <div class="mhandle"></div>
+    <div class="mtitle">Nova Categoria</div>
+    <label class="flabel">Nome</label>
+    <input class="finput" id="novaCatNome" placeholder="Ex: Farmácia, Mercado...">
+    <label class="flabel">Cor</label>
+    <div class="color-picks" id="catColorPicks"></div>
+    <button class="savebtn" onclick="salvarNovaCategoria()" style="margin-top:12px">Criar Categoria</button>
+  </div>
+</div>
 
 <!-- BOTTOM NAV ROLÁVEL -->
 <div class="bnav">
@@ -372,6 +414,8 @@ main{padding:16px 16px 0}
         <div><label class="flabel">Parcela inicial</label><input class="finput" id="iParcAtual" type="number" min="1" max="120" placeholder="Ex: 1" inputmode="numeric"></div>
       </div>
     </div>
+    <label class="flabel">Categoria <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+    <select class="cat-select" id="iCat"></select>
     <button class="savebtn" onclick="saveItem()">Salvar</button>
   </div>
 </div>
@@ -653,6 +697,8 @@ function render(){
 
   // Editar lista
   renderEditList();
+  renderCatEditList();
+  renderCatBars();
 }
 
 function renderDonut(grupos){
@@ -698,9 +744,11 @@ function renderGrupo(gid){
     let badge='';
     if(i.rec==='fixo') badge='<span class="irec">fixo</span>';
     else if(i.rec==='parcelado') badge=`<span class="irec parcelado">${i.parcAtual||1}/${i.totalParc||1}</span>`;
+    const catObj=loadCats().find(c=>c.id===i.cat);
+    const catBadge=catObj?`<span class="cat-badge" style="background:${catObj.cor}20;color:${catObj.cor}">${catObj.nome}</span>`:'';
     return`<div class="irow">
       <div class="idot" style="background:${g.cor}"></div>
-      <div class="idesc">${i.desc}</div>
+      <div class="idesc">${i.desc}${catBadge}</div>
       ${badge}
       <div class="ival">${fmt(i.value)}</div>
       <div class="ibtns">
@@ -745,6 +793,7 @@ function openItemModal(gid){
   document.getElementById('parcelasRow').style.display='none';
   document.getElementById('iTotalParc').value='';
   document.getElementById('iParcAtual').value='1';
+  buildCatSelect('');
   openOv('ovItem');
   setTimeout(()=>document.getElementById('iDesc').focus(),300);
 }
@@ -762,6 +811,7 @@ function openEditItemModal(gid,id){
     document.getElementById('iTotalParc').value=item.totalParc||'';
     document.getElementById('iParcAtual').value=item.parcAtual||1;
   }else{document.getElementById('parcelasRow').style.display='none';}
+  buildCatSelect(item.cat||'');
   openOv('ovItem');
   setTimeout(()=>document.getElementById('iDesc').focus(),300);
 }
@@ -771,6 +821,7 @@ function saveItem(){
   const val=parseFloat(document.getElementById('iVal').value);
   const rec=document.getElementById('iRec').value;
   if(!desc||isNaN(val)||val<=0){toast('Preencha descrição e valor.');return;}
+  const cat=document.getElementById('iCat').value||'';
   let extra={};
   if(rec==='parcelado'){
     const tot=parseInt(document.getElementById('iTotalParc').value)||0;
@@ -780,10 +831,10 @@ function saveItem(){
   }
   let list=loadItens(editGrupoId);
   if(editItemId){
-    list=list.map(i=>i.id===editItemId?{...i,desc,value:val,rec,...extra}:i);
+    list=list.map(i=>i.id===editItemId?{...i,desc,value:val,rec,cat,...extra}:i);
     toast('Item atualizado!');
   }else{
-    list.push({id:Date.now(),desc,value:val,rec,...extra});
+    list.push({id:Date.now(),desc,value:val,rec,cat,...extra});
     toast('Item salvo!');
   }
   saveItens(editGrupoId,list);
@@ -940,6 +991,12 @@ function gerarRel(){
   const rs=document.getElementById('relSaldo');rs.textContent=fmt(saldoR);rs.className='rel-kpi-val '+(saldoR>=0?'pos':'neg');
   document.getElementById('relMedia').textContent=fmt(media);
   document.getElementById('relGrupos').innerHTML=grupos.map(g=>`<div class="rel-grupo-row"><span class="rel-grupo-name"><span class="rel-grupo-dot" style="background:${g.cor}"></span>${g.nome}</span><span class="rel-grupo-val">${fmt(pg[g.id])}</span></div>`).join('');
+  const {cats:relCatsList,totais:relCatsTotais}=getCatTotaisRel(meses);
+  const totalCatGasto=Object.values(relCatsTotais).reduce((s,v)=>s+v,0);
+  const catComValor=relCatsList.filter(c=>relCatsTotais[c.id]>0).sort((a,b)=>relCatsTotais[b.id]-relCatsTotais[a.id]);
+  document.getElementById('relCats').innerHTML=catComValor.length
+    ?catComValor.map(c=>`<div class="rel-grupo-row"><span class="rel-grupo-name"><span class="rel-grupo-dot" style="background:${c.cor}"></span>${c.nome}</span><span class="rel-grupo-val">${fmt(relCatsTotais[c.id])}</span></div>`).join('')
+    :'<div style="color:var(--muted);font-size:.82rem">Nenhum gasto categorizado.</div>';
   if(meses.length>1){document.getElementById('relMesesWrap').style.display='block';document.getElementById('relMeses').innerHTML=pm.map(({m,y,total,renda})=>`<div class="rel-mes-row"><div class="rel-mes-name">${MESES_FULL[m]} ${y}</div><div class="rel-mes-vals"><span style="color:var(--green)">${fmt(renda)}</span><span style="color:var(--red)">${fmt(total)}</span><span style="color:${renda-total>=0?'var(--green)':'var(--red)'}">${fmt(renda-total)}</span></div></div>`).join('');}
   else{document.getElementById('relMesesWrap').style.display='none';}
   document.getElementById('relResultado').style.display='block';
@@ -989,6 +1046,127 @@ function importBk(e){
   reader.readAsText(file);e.target.value='';
 }
 function tryParse(s){try{return JSON.parse(s);}catch{return s;}}
+
+// ── CATEGORIAS ───────────────────────────────────────────────────────────
+const CATS_DEFAULT=[
+  {id:'farm',nome:'Farmácia',cor:'#dc2626'},
+  {id:'merca',nome:'Mercado',cor:'#00b87a'},
+  {id:'assin',nome:'Assinaturas',cor:'#7c3aed'},
+  {id:'transp',nome:'Transporte',cor:'#d97706'},
+  {id:'lazer',nome:'Lazer',cor:'#0891b2'},
+  {id:'saude',nome:'Saúde',cor:'#db2777'},
+  {id:'outros',nome:'Outros',cor:'#8a93a8'},
+];
+function loadCats(){return _cache['cfin_cats']||CATS_DEFAULT;}
+function saveCats(c){_cache['cfin_cats']=c;dbSet('cfin_cats',c);}
+
+let selectedCatColor=CORES_PALETA[0];
+
+function buildCatSelect(selectedId=''){
+  const cats=loadCats();
+  const el=document.getElementById('iCat');
+  if(!el)return;
+  el.innerHTML='<option value="">— Sem categoria —</option>'+
+    cats.map(c=>`<option value="${c.id}"${c.id===selectedId?' selected':''}>${c.nome}</option>`).join('');
+}
+
+function openNovaCatModal(){
+  selectedCatColor=CORES_PALETA[0];
+  document.getElementById('novaCatNome').value='';
+  buildCatColorPicks();
+  openOv('ovCat');
+  setTimeout(()=>document.getElementById('novaCatNome').focus(),300);
+}
+
+function buildCatColorPicks(){
+  const el=document.getElementById('catColorPicks');
+  if(!el)return;
+  el.innerHTML=CORES_PALETA.map(c=>`
+    <div class="cpick${c===selectedCatColor?' selected':''}" style="background:${c}" onclick="selectCatColor('${c}')"></div>
+  `).join('');
+}
+
+function selectCatColor(c){
+  selectedCatColor=c;
+  document.querySelectorAll('#catColorPicks .cpick').forEach(el=>{
+    el.classList.toggle('selected',el.style.background===c||el.style.backgroundColor===c);
+  });
+}
+
+function salvarNovaCategoria(){
+  const nome=document.getElementById('novaCatNome').value.trim();
+  if(!nome){toast('Digite o nome da categoria.');return;}
+  const cats=loadCats();
+  cats.push({id:'c'+Date.now(),nome,cor:selectedCatColor});
+  saveCats(cats);
+  document.getElementById('ovCat').classList.remove('open');
+  renderCatEditList();
+  buildCatSelect();
+  toast('Categoria "'+nome+'" criada!');
+}
+
+function delCategoria(cid){
+  const cats=loadCats().filter(c=>c.id!==cid);
+  saveCats(cats);
+  renderCatEditList();
+  toast('Categoria removida.');
+}
+
+function renderCatEditList(){
+  const cats=loadCats();
+  const el=document.getElementById('catEditList');
+  if(!el)return;
+  if(!cats.length){el.innerHTML='<div class="empty">Nenhuma categoria.</div>';return;}
+  el.innerHTML=cats.map(c=>`
+    <div class="cat-edit-row">
+      <div class="cat-edit-dot" style="background:${c.cor}"></div>
+      <div class="cat-edit-name">${c.nome}</div>
+      <button class="cat-edit-del" onclick="delCategoria('${c.id}')">Remover</button>
+    </div>`).join('');
+}
+
+function renderCatBars(){
+  const cats=loadCats();
+  const grupos=loadGrupos();
+  const totais={};
+  cats.forEach(c=>totais[c.id]=0);
+  grupos.forEach(g=>{
+    loadItens(g.id).forEach(i=>{
+      if(i.cat&&totais[i.cat]!==undefined) totais[i.cat]+=i.value;
+      else if(i.cat){totais[i.cat]=(totais[i.cat]||0)+i.value;}
+    });
+  });
+  const total=Object.values(totais).reduce((s,v)=>s+v,0);
+  const el=document.getElementById('catBars');
+  if(!el)return;
+  const comValor=cats.filter(c=>totais[c.id]>0);
+  if(!comValor.length){el.innerHTML='<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px 0">Nenhum gasto categorizado ainda.</div>';return;}
+  el.innerHTML=comValor.sort((a,b)=>totais[b.id]-totais[a.id]).map(c=>{
+    const pct=total>0?(totais[c.id]/total*100):0;
+    return`<div class="cat-item">
+      <div class="cat-row">
+        <span class="cat-name"><span class="cat-dot" style="background:${c.cor}"></span>${c.nome}</span>
+        <span class="cat-val">${fmt(totais[c.id])}</span>
+      </div>
+      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${pct}%;background:${c.cor}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function getCatTotaisRel(meses){
+  const cats=loadCats();
+  const grupos=loadGrupos();
+  const totais={};
+  cats.forEach(c=>totais[c.id]=0);
+  meses.forEach(({m,y})=>{
+    grupos.forEach(g=>{
+      loadItens(g.id,m,y).forEach(i=>{
+        if(i.cat&&totais[i.cat]!==undefined) totais[i.cat]+=i.value;
+      });
+    });
+  });
+  return {cats,totais};
+}
 
 // ── SEED ──────────────────────────────────────────────────────────────────
 function seed(){
