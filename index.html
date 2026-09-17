@@ -1266,7 +1266,7 @@ function renderCatBars(){
   const comValor=cats.filter(c=>totais[c.id]>0);
   if(!comValor.length){el.innerHTML='<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px 0">Nenhum gasto categorizado ainda.</div>';return;}
   el.innerHTML=comValor.sort((a,b)=>totais[b.id]-totais[a.id]).map(c=>{
-    const pct=total>0?Math.round(totais[c.id]/total*100):0;
+    const pct=total>0?(totais[c.id]/total*100).toFixed(1):'0.0';
     return`<div class="cat-item">
       <div class="cat-row">
         <span class="cat-name"><span class="cat-dot" style="background:${c.cor}"></span>${c.nome}<span style="color:var(--muted);font-weight:400"> — ${pct}%</span></span>
