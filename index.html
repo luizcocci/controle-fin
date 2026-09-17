@@ -216,7 +216,7 @@ main{padding:16px 16px 0}
 .cat-card{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px #0000000a}
 .cat-item{margin-bottom:10px}.cat-item:last-child{margin-bottom:0}
 .cat-row{display:flex;justify-content:space-between;margin-bottom:4px}
-.cat-name{font-size:.82rem;font-weight:500;display:flex;align-items:center;gap:6px}
+.cat-name{font-size:.82rem;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .cat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .cat-val{font-size:.82rem;font-family:'JetBrains Mono',monospace;color:var(--muted)}
 .cat-bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
@@ -1266,10 +1266,10 @@ function renderCatBars(){
   const comValor=cats.filter(c=>totais[c.id]>0);
   if(!comValor.length){el.innerHTML='<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px 0">Nenhum gasto categorizado ainda.</div>';return;}
   el.innerHTML=comValor.sort((a,b)=>totais[b.id]-totais[a.id]).map(c=>{
-    const pct=total>0?(totais[c.id]/total*100):0;
+    const pct=total>0?Math.round(totais[c.id]/total*100):0;
     return`<div class="cat-item">
       <div class="cat-row">
-        <span class="cat-name"><span class="cat-dot" style="background:${c.cor}"></span>${c.nome}</span>
+        <span class="cat-name"><span class="cat-dot" style="background:${c.cor}"></span>${c.nome}<span style="color:var(--muted);font-weight:400"> — ${pct}%</span></span>
         <span class="cat-val">${fmt(totais[c.id])}</span>
       </div>
       <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${pct}%;background:${c.cor}"></div></div>
