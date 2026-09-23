@@ -901,7 +901,7 @@ function saveItem(){
             saveItens(editGrupoId,fl.filter((_,j)=>j!==idx),fm,fy);
           }
         } else if(rec==='fixo'){
-          fl[idx]={...fl[idx],desc,value:val,rec,cat};
+          fl[idx]={...fl[idx],desc,value:val,rec,cat,diaVenc:extra.diaVenc};
           saveItens(editGrupoId,fl,fm,fy);
         } else {
           // Mudou para variável — remove propagações futuras
