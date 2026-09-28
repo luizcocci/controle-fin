@@ -1289,7 +1289,7 @@ function renderCatBars(){
     return`<div class="cat-item">
       <div class="cat-row">
         <span class="cat-name"><span class="cat-dot" style="background:${c.cor}"></span>${c.nome}</span>
-        <span class="cat-val">${fmt(totais[c.id])}</span>
+        <span class="cat-val">${fmt(totais[c.id])}<span style="font-size:.7rem;color:var(--muted);margin-left:4px">(${pct.toFixed(1)}%)</span></span>
       </div>
       <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${pct}%;background:${c.cor}"></div></div>
     </div>`;
