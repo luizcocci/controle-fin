@@ -1112,24 +1112,115 @@ function gerarRel(){
   else{document.getElementById('relMesesWrap').style.display='none';}
   document.getElementById('relResultado').style.display='block';
   setTimeout(()=>document.getElementById('relResultado').scrollIntoView({behavior:'smooth'}),100);
+
+  // Guarda dados estruturados para geração do PDF real
+  window._ultimoRel={
+    titulo,subtitulo,
+    receitaFmt:fmt(totalRenda),gastoFmt:fmt(totalGasto),saldoFmt:fmt(saldoR),mediaFmt:fmt(media),
+    saldoPos:saldoR>=0,
+    grupos:grupos.map(g=>({nome:g.nome,valFmt:fmt(pg[g.id])})),
+    cats:catComValor.map(c=>({nome:c.nome,valFmt:fmt(relCatsTotais[c.id])})),
+    meses:meses.length>1?pm.map(({m,y,total,renda})=>({label:MESES_FULL[m]+' '+y,rendaFmt:fmt(renda),gastoFmt:fmt(total),saldoFmt:fmt(renda-total)})):[]
+  };
 }
-function exportPDF(){
-  const titulo=document.getElementById('relTituloH').textContent;
-  const receita=document.getElementById('relReceita').textContent;
-  const gasto=document.getElementById('relGasto').textContent;
-  const saldo=document.getElementById('relSaldo').textContent;
-  const media=document.getElementById('relMedia').textContent;
-  const saldoPos=document.getElementById('relSaldo').classList.contains('pos');
-  const grupos=document.getElementById('relGrupos').innerHTML;
-  const mesesWrap=document.getElementById('relMesesWrap');
-  const mesesHTML=mesesWrap.style.display!=='none'?'<div class="st">POR MÊS</div>'+document.getElementById('relMeses').innerHTML:'';
-  const agora=new Date().toLocaleDateString('pt-BR')+' '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${titulo}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#f4f6f9;color:#0f1218;padding:20px;max-width:480px;margin:0 auto}.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.topbar h2{font-size:.85rem;font-weight:600;color:#8a93a8}.pdfbtn{background:#00b87a;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:.82rem;font-weight:700;cursor:pointer}.btnrow{display:flex;gap:8px}.closebtn{background:#e8ecf2;color:#0f1218;border:none;border-radius:10px;padding:10px 16px;font-size:.82rem;font-weight:700;cursor:pointer}.card{background:#fff;border-radius:16px;overflow:hidden;margin-bottom:16px;border:1px solid #e8ecf2}.hd{background:#0f1218;color:#fff;padding:18px}.hd h1{font-size:1rem;font-weight:700;margin-bottom:3px}.hd p{font-size:.7rem;opacity:.5}.kpis{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#e8ecf2}.kpi{background:#fff;padding:14px}.kl{font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a93a8;margin-bottom:5px}.kv{font-family:monospace;font-size:1rem;font-weight:600}.pos{color:#00b87a}.neg{color:#dc2626}.sec{padding:16px}.st{font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a93a8;margin-bottom:11px;margin-top:6px}.rel-grupo-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e8ecf2;font-size:.83rem}.rel-grupo-row:last-child{border-bottom:none}.rel-grupo-name{display:flex;align-items:center;gap:7px;font-weight:500}.rel-grupo-dot{width:7px;height:7px;border-radius:50%}.rel-grupo-val{font-family:monospace;font-size:.8rem;color:#8a93a8}.rel-mes-row{padding:9px 0;border-bottom:1px solid #e8ecf2}.rel-mes-row:last-child{border-bottom:none}.rel-mes-name{font-size:.73rem;font-weight:700;color:#8a93a8;margin-bottom:4px;text-transform:uppercase}.rel-mes-vals{display:flex;justify-content:space-between;font-size:.8rem}.ft{text-align:center;font-size:.68rem;color:#8a93a8;margin-top:10px}@media print{.topbar{display:none}}</style></head><body><div class="topbar"><h2>Compartilhar → Imprimir → PDF</h2><div class="btnrow"><button class="closebtn" onclick="window.close();if(!window.closed){history.back();}">Fechar</button><button class="pdfbtn" onclick="window.print()">Imprimir</button></div></div><div class="card"><div class="hd"><h1>${titulo}</h1><p>Controle.fin</p></div><div class="kpis"><div class="kpi"><div class="kl">Receita Total</div><div class="kv pos">${receita}</div></div><div class="kpi"><div class="kl">Gasto Total</div><div class="kv neg">${gasto}</div></div><div class="kpi"><div class="kl">Saldo</div><div class="kv ${saldoPos?'pos':'neg'}">${saldo}</div></div><div class="kpi"><div class="kl">Média Mensal</div><div class="kv">${media}</div></div></div><div class="sec"><div class="st">POR GRUPO</div>${grupos}${mesesHTML}</div></div><div class="ft">Gerado em ${agora}</div></body></html>`;
-  const blob=new Blob([html],{type:'text/html'});
-  const blobUrl=URL.createObjectURL(blob);
-  const w=window.open(blobUrl,'_blank');
-  if(w){toast('Relatório aberto! Compartilhar → Imprimir → PDF');}
-  else{window.location.href=blobUrl;}
+
+// ── PDF REAL (jsPDF, carregado sob demanda) ─────────────────────────────
+function loadJsPDF(){
+  return new Promise((resolve,reject)=>{
+    if(window.jspdf){resolve();return;}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload=()=>resolve();
+    s.onerror=()=>reject(new Error('sem conexão'));
+    document.head.appendChild(s);
+  });
+}
+async function exportPDF(){
+  const rel=window._ultimoRel;
+  if(!rel){toast('Gere o relatório primeiro.');return;}
+  toast('Gerando PDF...');
+  try{ await loadJsPDF(); }
+  catch{ toast('Sem conexão para gerar o PDF. Conecte-se e tente de novo.'); return; }
+
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'pt',format:'a4'});
+  const pageW=doc.internal.pageSize.getWidth();
+  const pageH=doc.internal.pageSize.getHeight();
+  const mx=40;
+  let y=50;
+
+  function checkPage(need){ if(y+need>pageH-40){doc.addPage();y=50;} }
+
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(15,18,24);
+  doc.text(rel.titulo,mx,y);y+=18;
+  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(138,147,168);
+  doc.text('Controle.fin — '+rel.subtitulo,mx,y);y+=32;
+
+  function kpi(label,val,x,yy,color){
+    doc.setFontSize(8);doc.setTextColor(138,147,168);
+    doc.text(label.toUpperCase(),x,yy);
+    doc.setFontSize(13);doc.setFont('helvetica','bold');
+    doc.setTextColor(color?color[0]:15,color?color[1]:18,color?color[2]:24);
+    doc.text(val,x,yy+16);
+    doc.setFont('helvetica','normal');doc.setTextColor(15,18,24);
+  }
+  kpi('Receita Total',rel.receitaFmt,mx,y,[0,184,122]);
+  kpi('Gasto Total',rel.gastoFmt,mx+260,y,[220,38,38]);
+  y+=36;
+  kpi('Saldo',rel.saldoFmt,mx,y,rel.saldoPos?[0,184,122]:[220,38,38]);
+  kpi('Média Mensal',rel.mediaFmt,mx+260,y);
+  y+=36;
+  doc.setDrawColor(232,236,242);doc.line(mx,y,pageW-mx,y);y+=24;
+
+  function sectionTitle(t){
+    checkPage(30);
+    doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(138,147,168);
+    doc.text(t.toUpperCase(),mx,y);
+    doc.setFont('helvetica','normal');doc.setTextColor(15,18,24);
+    y+=16;
+  }
+  function row(label,val){
+    checkPage(18);
+    doc.setFontSize(10);
+    doc.text(label,mx,y);
+    doc.text(val,pageW-mx,y,{align:'right'});
+    y+=16;
+  }
+
+  sectionTitle('Por Grupo');
+  rel.grupos.forEach(g=>row(g.nome,g.valFmt));
+  y+=14;
+
+  if(rel.cats.length){
+    sectionTitle('Por Categoria');
+    rel.cats.forEach(c=>row(c.nome,c.valFmt));
+    y+=14;
+  }
+
+  if(rel.meses.length){
+    sectionTitle('Por Mês');
+    rel.meses.forEach(m=>row(m.label,m.rendaFmt+'  /  '+m.gastoFmt+'  /  '+m.saldoFmt));
+  }
+
+  checkPage(20);
+  doc.setFontSize(8);doc.setTextColor(150,150,150);
+  doc.text('Gerado em '+new Date().toLocaleDateString('pt-BR')+' '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),mx,pageH-30);
+
+  const slug=rel.titulo.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+  const blob=doc.output('blob');
+  const fname='relatorio-'+slug+'.pdf';
+
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],fname,{type:'application/pdf'})]})){
+    try{
+      await navigator.share({files:[new File([blob],fname,{type:'application/pdf'})],title:rel.titulo});
+      toast('PDF compartilhado!');
+      return;
+    }catch(e){ /* usuário cancelou o share sheet — cai no download abaixo */ }
+  }
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+  toast('PDF salvo! Confira em Arquivos/Downloads.');
 }
 
 // ── BACKUP ────────────────────────────────────────────────────────────────
