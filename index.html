@@ -321,7 +321,7 @@ main{padding:16px 16px 0}
       <div class="bkinfo">Exporte para salvar no Google Drive.<br>Restaure para recuperar em outro iPhone.</div>
       <input type="file" id="importInput" accept=".json" onchange="importBk(event)">
     </div>
-    <div class="ver">Controle.fin v17</div>
+    <div class="ver">Controle.fin v18</div>
   </div>
 
   <!-- GRUPO PANEL (dinâmico) -->
@@ -381,7 +381,7 @@ main{padding:16px 16px 0}
           <button class="rel-btn2" onclick="downloadPDF()">💾 Baixar PDF</button>
         </div>
         <button class="rel-btn2 full" onclick="printRel()">🖨️ Imprimir</button>
-        <div class="rel-hint">Compartilhar abre o menu do iPhone (Salvar em Arquivos, WhatsApp, E-mail…).</div>
+        <div class="rel-hint">Compartilhar e Imprimir abrem o menu do iPhone (Salvar em Arquivos, WhatsApp, E-mail, Imprimir…).</div>
       </div>
     </div>
   </div>
@@ -1475,10 +1475,20 @@ function downloadPDF(){
   }catch(e){toast('Erro ao baixar PDF: '+e.message);}
 }
 function printRel(){
+  // window.print() não funciona em app da tela de início do iPhone. Imprimir = PDF do dashboard pelo menu do iOS ("Imprimir").
   try{
-    if(!window._ultimoRel){toast('Gere o relatório primeiro (toque em "Gerar Relatório").');return;}
-    window.print();
-  }catch(e){toast('Impressão indisponível aqui. Use "Compartilhar PDF".');}
+    const r=relPdfPronto();if(!r)return;
+    const file=new File([r.blob],r.fname,{type:'application/pdf'});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      toast('Na lista que abrir, toque em "Imprimir".');
+      navigator.share({files:[file],title:r.rel.titulo})
+        .catch(e=>{if(e&&e.name==='AbortError')return;toast('Não consegui abrir o menu ('+((e&&e.name)||'erro')+'). Use "Abrir PDF" e imprima por lá.');});
+    }else{
+      const url=URL.createObjectURL(r.blob);
+      const w=window.open(url,'_blank');
+      if(!w)toast('O navegador bloqueou a abertura. Use "Baixar PDF" e imprima o arquivo.');
+    }
+  }catch(e){toast('Erro ao imprimir: '+e.message);}
 }
 
 // ── BACKUP ────────────────────────────────────────────────────────────────
